@@ -1,10 +1,10 @@
+import React, { useEffect } from 'react' // ✅ HERO FIX: Added missing React import
 import { ThemeProvider } from '../contexts/ThemeContext'
 import { AuthProvider } from '../contexts/AuthContext'
 import { AnimatePresence } from 'framer-motion'
 import { Toaster } from 'react-hot-toast' // ✅ HERO FIX: Added missing Toaster import
 import '../styles/globals.css'
 import Head from 'next/head'
-import { useEffect } from 'react' // ✅ HERO FIX: Added useEffect for error handling
 
 // ✅ HERO FIX: Error Boundary Component
 class ErrorBoundary extends React.Component {
