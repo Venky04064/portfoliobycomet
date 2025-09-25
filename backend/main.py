@@ -68,11 +68,8 @@ def ensure_directories():
 def init_default_files():
     """Initialize all default configuration files."""
     default_files = {
-        DATA_STORAGE_DIR / "access_settings.txt": "access_code=Venky@access345",
-        DATA_STORAGE_DIR / "theme_settings.txt": """current_theme=cosmic_purple
-current_font=inter
-glassmorphic_opacity=0.2
-blur_intensity=20""",
+        DATA_STORAGE_DIR / "access_settings.txt": "Venky@access345",
+        DATA_STORAGE_DIR / "theme_settings.txt": "cosmic-purple",
         DATA_STORAGE_DIR / "media_settings.txt": json.dumps({
             f"slot{i}": "disabled" for i in range(1, 6)
         } | {
@@ -80,22 +77,6 @@ blur_intensity=20""",
         } | {
             f"slot{i}_caption": "" for i in range(1, 6)
         }, indent=2),
-        DATA_STORAGE_DIR / "portfolio_settings.txt": """profile_photo=enabled
-resume_download=enabled
-feedback_enabled=enabled
-analytics_enabled=enabled
-3d_effects=enabled
-smooth_animations=enabled""",
-        DATA_STORAGE_DIR / "landing_settings.txt": """current_landing=option1
-particle_density=medium
-animation_speed=normal
-3d_intensity=medium
-background_opacity=0.1""",
-        DATA_STORAGE_DIR / "analytics.txt": """visits=0
-today_visits=0
-unique_visitors=0
-last_reset=2025-01-01""",
-        DATA_STORAGE_DIR / "feedback" / "feedback.json": "[]"
     }
     
     for file_path, content in default_files.items():
@@ -195,20 +176,6 @@ def write_file_safe(file_path: Path, content: str) -> bool:
         logger.error(f"Error writing file {file_path}: {e}")
         return False
 
-def parse_config_file(content: str) -> Dict[str, str]:
-    """Parse key=value configuration file."""
-    config = {}
-    for line in content.split('\n'):
-        line = line.strip()
-        if '=' in line and not line.startswith('#'):
-            key, value = line.split('=', 1)
-            config[key.strip()] = value.strip()
-    return config
-
-def write_config_file(config: Dict[str, str]) -> str:
-    """Write configuration to key=value format."""
-    return '\n'.join([f"{k}={v}" for k, v in config.items()])
-
 # ✅ HERO FIX: Enhanced JWT functions
 def create_access_token(data: dict, expires_delta: Optional[datetime.timedelta] = None):
     """Create JWT token with proper expiration."""
@@ -235,7 +202,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         return {"username": username, "exp": exp}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.JWTError as e:
+    except jwt.PyJWTError as e:  # ✅ FIXED: Proper JWT error handling
         logger.error(f"JWT Error: {e}")
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
     except Exception as e:
@@ -284,6 +251,80 @@ async def log_analytics(event_type: str, data: Dict[str, Any]):
 # ✅ HERO FIX: API ROUTES - ALL FIXED
 # ========================================
 
+@app.get("/api/debug/files")
+async def debug_files():
+    """🦸‍♂️ HERO FIX: Debug endpoint to check file contents in real-time"""
+    try:
+        files_content = {}
+        
+        # Read access settings
+        access_file = DATA_STORAGE_DIR / "access_settings.txt"
+        if access_file.exists():
+            files_content['access_code'] = read_file_safe(access_file).strip()
+        
+        # Read theme settings  
+        theme_file = DATA_STORAGE_DIR / "theme_settings.txt"
+        if theme_file.exists():
+            files_content['current_theme'] = read_file_safe(theme_file).strip()
+                
+        # Read content file
+        if CONTENT_FILE.exists():
+            content = read_file_safe(CONTENT_FILE)
+            files_content['content_preview'] = content[:200] + "..." if len(content) > 200 else content
+                
+        files_content['working_directory'] = str(BASE_DIR)
+        files_content['files_exist'] = {
+            'access_settings': access_file.exists(),
+            'theme_settings': theme_file.exists(),
+            'content': CONTENT_FILE.exists()
+        }
+        
+        return {"success": True, "files": files_content}
+    except Exception as e:
+        return {"success": False, "error": str(e), "cwd": str(BASE_DIR)}
+
+@app.get("/api/settings/refresh")
+async def refresh_settings():
+    """🦸‍♂️ HERO FIX: Force refresh all settings from files"""
+    try:
+        settings = {}
+        
+        # Access code
+        access_file = DATA_STORAGE_DIR / "access_settings.txt"
+        if access_file.exists():
+            settings['access_code'] = read_file_safe(access_file).strip()
+        
+        # Theme
+        theme_file = DATA_STORAGE_DIR / "theme_settings.txt"
+        if theme_file.exists():
+            settings['theme'] = read_file_safe(theme_file).strip()
+                
+        return {"success": True, "settings": settings}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/themes")
+async def get_themes():
+    """🦸‍♂️ HERO FIX: Get themes with real-time file reading"""
+    try:
+        # Read current theme from file every time
+        current_theme = 'cosmic-purple'
+        theme_file = DATA_STORAGE_DIR / "theme_settings.txt"
+        if theme_file.exists():
+            current_theme = read_file_safe(theme_file).strip()
+        
+        themes = {
+            "creative": ["cosmic-purple", "lavender-dream", "rose-quartz", "crimson-red", "pink-flamingo", "purple-haze", "violet-storm"],
+            "tech": ["aurora-blue", "indigo-night", "cyan-wave", "sky-limit", "zinc-modern"],
+            "corporate": ["forest-green", "emerald-city", "slate-storm", "stone-age"],
+            "minimal": ["ocean-teal", "mint-fresh", "teal-depths", "neutral-space"],
+            "vibrant": ["sunset-orange", "golden-hour", "amber-glow", "lime-zest", "orange-burst"]
+        }
+        
+        return {"themes": themes, "current": current_theme}
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.post("/api/auth/login")
 async def login(request: LoginRequest):
     """Enhanced login with real-time access code validation."""
@@ -293,8 +334,7 @@ async def login(request: LoginRequest):
         if not access_file.exists():
             raise HTTPException(status_code=500, detail="Access configuration not found")
         
-        config = parse_config_file(read_file_safe(access_file))
-        stored_access_code = config.get("access_code", "")
+        stored_access_code = read_file_safe(access_file).strip()
         
         if not stored_access_code:
             raise HTTPException(status_code=500, detail="Access code not configured")
@@ -337,26 +377,6 @@ async def verify_auth(current_user = Depends(verify_token)):
         "expires": current_user["exp"]
     }
 
-@app.post("/api/auth/refresh")
-async def refresh_token(current_user = Depends(verify_token)):
-    """Refresh JWT token."""
-    try:
-        new_token, expires = create_access_token(data={"sub": current_user["username"]})
-        
-        await log_analytics("token_refresh", {
-            "username": current_user["username"]
-        })
-        
-        return {
-            "access_token": new_token,
-            "token_type": "bearer", 
-            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "expires_at": expires.isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Token refresh error: {e}")
-        raise HTTPException(status_code=500, detail="Token refresh failed")
-
 @app.get("/api/portfolio/content")
 async def get_portfolio_content(request: Request):
     """Get portfolio content with visitor tracking."""
@@ -396,13 +416,13 @@ async def get_theme_settings():
     """Get current theme settings."""
     try:
         theme_file = DATA_STORAGE_DIR / "theme_settings.txt"
-        config = parse_config_file(read_file_safe(theme_file))
+        current_theme = read_file_safe(theme_file).strip() if theme_file.exists() else "cosmic-purple"
         
         return {
-            "current_theme": config.get("current_theme", "cosmic_purple"),
-            "current_font": config.get("current_font", "inter"),
-            "glassmorphic_opacity": float(config.get("glassmorphic_opacity", "0.2")),
-            "blur_intensity": int(config.get("blur_intensity", "20"))
+            "current_theme": current_theme,
+            "current_font": "inter",
+            "glassmorphic_opacity": 0.2,
+            "blur_intensity": 20
         }
     except Exception as e:
         logger.error(f"Theme settings error: {e}")
@@ -414,14 +434,7 @@ async def update_theme_settings(request: ThemeUpdateRequest, current_user = Depe
     try:
         theme_file = DATA_STORAGE_DIR / "theme_settings.txt"
         
-        config = {
-            "current_theme": request.theme,
-            "current_font": request.font,
-            "glassmorphic_opacity": str(request.glassmorphic_opacity),
-            "blur_intensity": str(request.blur_intensity)
-        }
-        
-        if write_file_safe(theme_file, write_config_file(config)):
+        if write_file_safe(theme_file, request.theme):
             await log_analytics("theme_change", {
                 "theme": request.theme,
                 "font": request.font,
@@ -437,144 +450,6 @@ async def update_theme_settings(request: ThemeUpdateRequest, current_user = Depe
     except Exception as e:
         logger.error(f"Theme update error: {e}")
         raise HTTPException(status_code=500, detail="Failed to update theme settings")
-
-@app.get("/api/media/settings")
-async def get_media_settings():
-    """Get media slot settings."""
-    try:
-        media_file = DATA_STORAGE_DIR / "media_settings.txt"
-        content = read_file_safe(media_file)
-        
-        if not content:
-            # Return default disabled settings
-            return {f"slot{i}": "disabled" for i in range(1, 6)}
-        
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            return parse_config_file(content)
-            
-    except Exception as e:
-        logger.error(f"Media settings error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve media settings")
-
-@app.post("/api/feedback")
-async def submit_feedback(request: FeedbackRequest, http_request: Request):
-    """Submit visitor feedback with validation."""
-    try:
-        # Get visitor info
-        client_ip = http_request.client.host
-        user_agent = http_request.headers.get("user-agent", "unknown")
-        
-        feedback_entry = {
-            "id": str(uuid.uuid4()),
-            "rating": request.rating,
-            "message": request.message.strip(),
-            "visitor_name": request.visitor_name.strip() if request.visitor_name else None,
-            "visitor_email": request.visitor_email if request.visitor_email else None,
-            "timestamp": datetime.datetime.utcnow().isoformat(),
-            "ip": client_ip,
-            "user_agent": user_agent,
-            "status": "new"
-        }
-        
-        # Save feedback
-        feedback_file = DATA_STORAGE_DIR / "feedback" / "feedback.json"
-        feedback_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        feedback_list = []
-        if feedback_file.exists():
-            async with aiofiles.open(feedback_file, 'r', encoding='utf-8') as f:
-                content = await f.read()
-                try:
-                    feedback_list = json.loads(content) if content.strip() else []
-                except json.JSONDecodeError:
-                    feedback_list = []
-        
-        feedback_list.append(feedback_entry)
-        
-        # Keep only last 500 feedback entries
-        feedback_list = feedback_list[-500:]
-        
-        async with aiofiles.open(feedback_file, 'w', encoding='utf-8') as f:
-            await f.write(json.dumps(feedback_list, indent=2, ensure_ascii=False))
-        
-        await log_analytics("feedback_submitted", {
-            "rating": request.rating,
-            "has_name": bool(request.visitor_name),
-            "has_email": bool(request.visitor_email)
-        })
-        
-        return {"status": "success", "message": "Thank you for your feedback!"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Feedback submission error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to submit feedback")
-
-@app.get("/api/feedback/list")
-async def get_feedback_list(current_user = Depends(verify_token)):
-    """Get all feedback for admin dashboard."""
-    try:
-        feedback_file = DATA_STORAGE_DIR / "feedback" / "feedback.json"
-        
-        if not feedback_file.exists():
-            return {"feedback": [], "total": 0}
-        
-        async with aiofiles.open(feedback_file, 'r', encoding='utf-8') as f:
-            content = await f.read()
-            feedback_list = json.loads(content) if content.strip() else []
-        
-        # Sort by timestamp (newest first)
-        feedback_list.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-        
-        return {"feedback": feedback_list, "total": len(feedback_list)}
-        
-    except Exception as e:
-        logger.error(f"Feedback retrieval error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve feedback")
-
-@app.get("/api/analytics")
-async def get_analytics(current_user = Depends(verify_token)):
-    """Get analytics data for admin dashboard."""
-    try:
-        analytics_file = DATA_STORAGE_DIR / "analytics" / "visits.json"
-        
-        if not analytics_file.exists():
-            return {
-                "summary": {"visits": 0, "today_visits": 0, "unique_visitors": 0},
-                "detailed_visits": []
-            }
-        
-        async with aiofiles.open(analytics_file, 'r', encoding='utf-8') as f:
-            content = await f.read()
-            analytics_data = json.loads(content) if content.strip() else []
-        
-        # Calculate summary statistics
-        today = datetime.datetime.now().date()
-        today_visits = sum(1 for entry in analytics_data 
-                          if entry.get("event_type") == "content_view" 
-                          and datetime.datetime.fromisoformat(entry.get("timestamp", "")).date() == today)
-        
-        unique_ips = set(entry.get("ip") for entry in analytics_data 
-                        if entry.get("event_type") == "content_view" and entry.get("ip"))
-        
-        summary = {
-            "visits": len([e for e in analytics_data if e.get("event_type") == "content_view"]),
-            "today_visits": today_visits,
-            "unique_visitors": len(unique_ips),
-            "last_updated": datetime.datetime.utcnow().isoformat()
-        }
-        
-        return {
-            "summary": summary,
-            "detailed_visits": analytics_data[-100:]  # Last 100 entries
-        }
-        
-    except Exception as e:
-        logger.error(f"Analytics retrieval error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve analytics")
 
 @app.get("/api/health")
 async def health_check():
