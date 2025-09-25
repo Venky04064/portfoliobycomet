@@ -1,0 +1,57 @@
+[PERSONAL_INFO]
+name=Venkatesh
+title=AUTOSAR Integration Engineer
+location=Bangalore, India
+email=contact@portfoliobycomet.com
+phone=+91-XXXXXXXXXX
+
+[HERO]
+headline=Experienced AUTOSAR Integration Engineer
+description=Proven expertise in configuring and validating BSW stacks (COM, CAN, BSWM, DCM, DEM, NvM) and RTE layers across BMW's EV platforms. Skilled in integrating proxy SWCs, managing ARXMLs, and conducting end-to-end ECU testing using Vector tools.
+
+[CORE_SKILLS]
+autosar_modules=NvM, DCM, DEM, BSWM, COM, CAN
+tools=DaVinci Configurator, DaVinci Developer, Canoe, Jenkins, Bamboo, Jira, Visual Studio, Tortoise SVN
+languages=C, Basic Python
+processes=AutoSAR Integration, BSW Configuration, RTE Generation, ECU Testing, Bug Analysis, Autosar SWC development, Arxml Analysis
+soft_skills=Communication, Team Collaboration, Problem Solving
+
+[CERTIFICATIONS]
+cert1=Master CAN Protocols-Udemy-JUN 2025
+cert2=AutoSAR Diagnostics (DEM, DCM, OBD, UDS) – Udemy, Jul 2024
+cert3=AutoSAR Architecture (Demo-based) – Udemy, May 2024
+cert4=Introduction to AutoSAR – EDUCBA, Feb 2024
+cert5=Programming in C– Sololearn, Jul 2022
+cert6=Communication Skills for Professionals – Udemy, Nov 2024
+cert7=ChatGPT Masterclass Udemy, Sep 2023
+
+[AWARDS]
+award1=High Flyers Award – KPIT, Feb 2023
+award2=Growth and Learning Champion – KPIT, Oct 2023
+award3=Review Champion – KPIT, Apr 2024
+award4=COMRADES - KPIT, JUN 2025
+
+[EDUCATION]
+degree=Bachelor's Degree – Electronics and Communications Engineering
+institution=Vaagdevi Institute of Technology and Science
+duration=Jan 2018 – Mar 2022
+
+[PROFESSIONAL_SUMMARY]
+summary=Experienced AUTOSAR Integration Engineer with proven expertise in configuring and validating BSW stacks (COM, CAN,BSWM, DCM, DEM, NvM) and RTE layers across BMW's EV platforms. Skilled in integrating proxy SWCs, managing ARXMLs, and conducting end-to-end ECU testing using Vector tools.
+
+[PROFESSIONAL_EXPERIENCE]
+current_role=Software Engineer | KPIT, Bangalore, India
+project1=DELTA CCU Integration BEV (Feb 2023 – Present)
+project1_desc=Implemented DCM and DEM modules for UDS diagnostics as per ISO 14229 standards. Implemented AUTOSAR BSW modules including COM, BSWM, CAN, and NvM. Validated diagnostics and communication stack functionality using CANoe tool. Used WinIdea for debugging RESET or SW issues during ECU software testing. Generated PDX and A2L files using Bamboo for flashing and validation processes. Followed V-cycle development process and adhered to ASPICE-compliant workflows. Used Jira for tracking bug-fix and development tasks assigned by the development team. Handled proxy generation, port connections, signal and runnable and Signal mappings in DaVinci Configurator. Resolved COM, CAN, DCM, DEM, NvM and data mapping errors using DaVinci Developer and Configurator. Integrated AUTOSAR SWCs by importing ARXMLs and creating runnables, ports, interfaces, constants, and triggers in DaVinci Developer. Mapped data types and access points in DaVinci Developer for SWC integration. Exposure to CAN protocols and ARXML file update analysis using Beyond Compare.
+
+project2=DELTA CCU SW Integration FuMu (Aug 2022 – Jan 2023)
+project2_desc=Integrated Com-Adapter and Proxy Software Components using Jenkins Pipeline. Analyzed ARXMLs, Performed RTE generation, SW builds, and conducted thorough bug fixes. Generated PDX and A2L files for test validation and customer delivery.
+
+intern_role=Intern | Remote Internship (Jun 2022 – Aug 2022)
+intern_desc=Worked on foundational AUTOSAR concepts, Jenkins pipeline basics. Built hands-on experience in C, diagnostics, Jenkins and system testing.
+
+[CONTACT]
+email=contact@portfoliobycomet.com
+linkedin=https://linkedin.com/in/venkatesh
+github=https://github.com/venkatesh
+location=Bangalore, India
