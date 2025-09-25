@@ -113,32 +113,8 @@ export default function App({ Component, pageProps, router }) {
     <ErrorBoundary>
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#6B46C1" />
-        
-        {/* ✅ HERO FIX: Enhanced PWA Meta Tags */}
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Portfolio by Comet" />
         <meta name="description" content="Advanced portfolio with 25+ glassmorphic themes and 3D animations" />
-        <meta name="format-detection" content="telephone=no" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="msapplication-TileColor" content="#6B46C1" />
-        <meta name="msapplication-tap-highlight" content="no" />
-        
-        {/* Font Preloads - Enhanced */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700&family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&family=Open+Sans:wght@300;400;500;600;700&family=Lato:wght@300;400;700&display=swap"
-          rel="stylesheet"
-        />
-        
-        {/* ✅ HERO FIX: Performance Hints */}
-        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
-        <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
-        <link rel="preconnect" href="https://api.portfoliobycomet.com" />
+        {/* ✅ HERO FIX: Fonts moved to _document.js - removed duplicate font links */}
       </Head>
       
       <ThemeProvider>
