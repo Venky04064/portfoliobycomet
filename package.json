@@ -1,13 +1,16 @@
 {
   "name": "portfolio-by-comet",
-  "version": "1.0.0",
+  "version": "1.0.0-hero-fix",
   "private": true,
+  "description": "🦸‍♂️ AI Hero Fixed - Advanced full-stack portfolio with 25+ glassmorphic themes",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "export": "next export"
+    "export": "next export",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf .next out node_modules/.cache"
   },
   "dependencies": {
     "@next/font": "^13.4.19",
@@ -26,7 +29,8 @@
     "@react-three/drei": "^9.88.2",
     "clsx": "^2.0.0",
     "class-variance-authority": "^0.7.0",
-    "js-cookie": "^3.0.5"
+    "js-cookie": "^3.0.5",
+    "@types/js-cookie": "^3.0.4"
   },
   "devDependencies": {
     "@types/node": "^20.6.0",
@@ -42,5 +46,43 @@
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=8.0.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "keywords": [
+    "portfolio",
+    "nextjs",
+    "react",
+    "glassmorphism",
+    "3d-animations",
+    "fastapi",
+    "vercel",
+    "responsive",
+    "autosar",
+    "engineer"
+  ],
+  "author": {
+    "name": "Portfolio by Comet",
+    "email": "contact@portfoliobycomet.com",
+    "url": "https://portfoliobycomet.vercel.app"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Venky04064/portfoliobycomet.git"
+  },
+  "homepage": "https://portfoliobycomet.vercel.app",
+  "bugs": {
+    "url": "https://github.com/Venky04064/portfoliobycomet/issues"
   }
 }
