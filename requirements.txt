@@ -1,46 +1,30 @@
 # ✅ AI HERO FIX: Complete Python Dependencies for Portfolio by Comet
-
 # FastAPI Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
-
 # Authentication & Security  
 pyjwt==2.8.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 cryptography==41.0.7
-
 # Data Validation & Processing
 pydantic==2.4.2
 pydantic[email]==2.4.2
-
 # File Handling & I/O
 python-multipart==0.0.6
 aiofiles==23.2.1
 pillow==10.0.1
-
 # Configuration
 python-dotenv==1.0.0
-
 # Date & Time
 python-dateutil==2.8.2
-
 # HTTP & Networking
 httpx==0.25.0
 requests==2.31.0
-
+# Database (Neon Postgres)
+asyncpg==0.29.0
 # Development & Testing (optional but recommended)
 black==23.9.1
 flake8==6.1.0
 pytest==7.4.2
 pytest-asyncio==0.21.1
-
-# Production Dependencies
-gunicorn==21.2.0  # For production deployment
-psutil==5.9.5     # System monitoring
-
-# Logging & Monitoring
-structlog==23.2.0
-
-# Performance
-orjson==3.9.7     # Faster JSON serialization
