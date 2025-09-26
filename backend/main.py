@@ -1,137 +1,41 @@
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Request, status
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, EmailStr, Field
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 import jwt
 import os
 import json
 import datetime
 import uuid
-import shutil
 import aiofiles
 from pathlib import Path
-import mimetypes
 import logging
 from contextlib import asynccontextmanager
+import asyncpg
 
-# ✅ HERO FIX: Enhanced logging
+# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ✅ HERO FIX: Secure configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-jwt-key-change-this-in-production-hero-fix")
+# Config
+SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-prod")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+NEON_DB_URL = os.getenv("NEON_DB_URL")  # postgres://...neon.tech/... or postgresql://
 
-# ✅ HERO FIX: Enhanced file paths
+# Paths (file-based fallback)
 BASE_DIR = Path(__file__).parent
 DATA_STORAGE_DIR = BASE_DIR / "data-storage"
 UPLOAD_DIR = BASE_DIR / "upload"
 CONTENT_FILE = BASE_DIR / "content.txt"
 
-# ✅ HERO FIX: File validation constants
-ALLOWED_EXTENSIONS = {
-    'image': ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'],
-    'video': ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.ogg'],
-    'document': ['.pdf', '.doc', '.docx']
-}
-MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB
+# Database pool
+db_pool: Optional[asyncpg.Pool] = None
 
-# ✅ HERO FIX: Enhanced directory creation
-def ensure_directories():
-    """Create all necessary directories with proper error handling."""
-    directories = [
-        DATA_STORAGE_DIR,
-        DATA_STORAGE_DIR / "analytics",
-        DATA_STORAGE_DIR / "feedback",
-        UPLOAD_DIR,
-        UPLOAD_DIR / "media-slots",
-        UPLOAD_DIR / "profile-photo", 
-        UPLOAD_DIR / "resume"
-    ]
-    
-    # Create media slot subdirectories
-    for i in range(1, 6):
-        directories.append(UPLOAD_DIR / "media-slots" / f"slot{i}")
-    
-    for directory in directories:
-        try:
-            directory.mkdir(parents=True, exist_ok=True)
-            logger.info(f"✅ Directory ensured: {directory}")
-        except Exception as e:
-            logger.error(f"❌ Failed to create directory {directory}: {e}")
-            raise
-
-# ✅ HERO FIX: Initialize default files
-def init_default_files():
-    """Initialize all default configuration files."""
-    default_files = {
-        DATA_STORAGE_DIR / "access_settings.txt": "Venky@access345",
-        DATA_STORAGE_DIR / "theme_settings.txt": "cosmic-purple",
-        DATA_STORAGE_DIR / "media_settings.txt": json.dumps({
-            f"slot{i}": "disabled" for i in range(1, 6)
-        } | {
-            f"slot{i}_title": "" for i in range(1, 6)  
-        } | {
-            f"slot{i}_caption": "" for i in range(1, 6)
-        }, indent=2),
-    }
-    
-    for file_path, content in default_files.items():
-        if not file_path.exists():
-            try:
-                file_path.parent.mkdir(parents=True, exist_ok=True)
-                file_path.write_text(content, encoding='utf-8')
-                logger.info(f"✅ Created default file: {file_path}")
-            except Exception as e:
-                logger.error(f"❌ Failed to create {file_path}: {e}")
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # ✅ HERO FIX: Startup
-    logger.info("🚀 Starting Portfolio by Comet API...")
-    try:
-        ensure_directories()
-        init_default_files()
-        logger.info("✅ Application startup completed successfully")
-    except Exception as e:
-        logger.error(f"❌ Startup failed: {e}")
-        raise
-    yield
-    # ✅ HERO FIX: Shutdown
-    logger.info("👋 Portfolio by Comet API shutting down...")
-
-# ✅ HERO FIX: FastAPI App with enhanced configuration
-app = FastAPI(
-    title="Portfolio by Comet API",
-    description="🦸‍♂️ AI Hero Fixed Backend API for dynamic portfolio",
-    version="1.0.0-hero-fix",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    lifespan=lifespan
-)
-
-# ✅ HERO FIX: Enhanced CORS Middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://*.vercel.app",
-        "https://portfoliobycomet.vercel.app"
-    ],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
-
-# ✅ HERO FIX: Security
-security = HTTPBearer()
-
-# ✅ HERO FIX: Enhanced Pydantic Models
+# Models
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=50)
     access_code: str = Field(..., min_length=1, max_length=100)
@@ -144,358 +48,233 @@ class FeedbackRequest(BaseModel):
 
 class ThemeUpdateRequest(BaseModel):
     theme: str = Field(..., min_length=1, max_length=50)
-    font: str = Field(..., min_length=1, max_length=50)
+    font: str = Field("inter", min_length=1, max_length=50)
     glassmorphic_opacity: float = Field(0.2, ge=0.0, le=1.0)
     blur_intensity: int = Field(20, ge=0, le=100)
 
-class MediaSlotRequest(BaseModel):
-    slot: int = Field(..., ge=1, le=5)
-    enabled: bool
-    title: str = Field("", max_length=100)
-    caption: str = Field("", max_length=500)
-
-# ✅ HERO FIX: Enhanced utility functions
+# Utils
 def read_file_safe(file_path: Path) -> str:
-    """Safely read file with error handling."""
     try:
         return file_path.read_text(encoding='utf-8')
-    except FileNotFoundError:
-        logger.warning(f"File not found: {file_path}")
-        return ""
-    except Exception as e:
-        logger.error(f"Error reading file {file_path}: {e}")
+    except Exception:
         return ""
 
 def write_file_safe(file_path: Path, content: str) -> bool:
-    """Safely write file with error handling."""
     try:
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(content, encoding='utf-8')
         return True
-    except Exception as e:
-        logger.error(f"Error writing file {file_path}: {e}")
+    except Exception:
         return False
 
-# ✅ HERO FIX: Enhanced JWT functions
+# Auth
+security = HTTPBearer()
+
 def create_access_token(data: dict, expires_delta: Optional[datetime.timedelta] = None):
-    """Create JWT token with proper expiration."""
     to_encode = data.copy()
     expire = datetime.datetime.utcnow() + (expires_delta or datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire, "iat": datetime.datetime.utcnow()})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt, expire
+    token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return token, expire
 
-def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Verify JWT token with enhanced error handling."""
+def require_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        exp: int = payload.get("exp")
-        
-        if username is None:
-            raise HTTPException(status_code=401, detail="Invalid authentication credentials")
-        
-        # Check token expiration
-        if datetime.datetime.utcnow().timestamp() > exp:
-            raise HTTPException(status_code=401, detail="Token has expired")
-            
-        return {"username": username, "exp": exp}
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.PyJWTError as e:  # ✅ FIXED: Proper JWT error handling
-        logger.error(f"JWT Error: {e}")
-        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
-    except Exception as e:
-        logger.error(f"Token verification error: {e}")
-        raise HTTPException(status_code=401, detail="Authentication failed")
+        return {"username": payload.get("sub"), "exp": payload.get("exp")}
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-# ✅ HERO FIX: Analytics logging
-async def log_analytics(event_type: str, data: Dict[str, Any]):
-    """Enhanced analytics logging."""
+# DB init and helpers
+async def init_db_pool():
+    global db_pool
+    if NEON_DB_URL:
+        db_pool = await asyncpg.create_pool(dsn=NEON_DB_URL, min_size=1, max_size=5)
+        async with db_pool.acquire() as conn:
+            await conn.execute(
+                """
+                create table if not exists themes (
+                  id serial primary key,
+                  current_theme text not null default 'cosmic-purple',
+                  font text not null default 'inter',
+                  glassmorphic_opacity real not null default 0.2,
+                  blur_intensity int not null default 20
+                );
+                """
+            )
+            await conn.execute(
+                """
+                create table if not exists access_settings (
+                  id serial primary key,
+                  access_code text not null
+                );
+                """
+            )
+            await conn.execute(
+                """
+                create table if not exists feedback (
+                  id uuid primary key,
+                  rating int not null,
+                  message text not null,
+                  visitor_name text,
+                  visitor_email text,
+                  created_at timestamptz not null default now()
+                );
+                """
+            )
+            # Seed single rows if empty
+            await conn.execute("insert into themes (current_theme) select 'cosmic-purple' where not exists (select 1 from themes);")
+            await conn.execute("insert into access_settings (access_code) select 'Venky@access345' where not exists (select 1 from access_settings);")
+    else:
+        logger.info("NEON_DB_URL not set. Using file-based storage.")
+
+async def get_access_code() -> str:
+    if db_pool:
+        async with db_pool.acquire() as conn:
+            row = await conn.fetchrow("select access_code from access_settings order by id asc limit 1")
+            return row[0] if row else ""
+    return read_file_safe(DATA_STORAGE_DIR / "access_settings.txt").strip() or ""
+
+async def set_theme_settings(t: ThemeUpdateRequest) -> None:
+    if db_pool:
+        async with db_pool.acquire() as conn:
+            await conn.execute("delete from themes where id not in (select id from themes order by id asc limit 1)")
+            await conn.execute(
+                "update themes set current_theme=$1, font=$2, glassmorphic_opacity=$3, blur_intensity=$4 where id in (select id from themes order by id asc limit 1)",
+                t.theme, t.font, t.glassmorphic_opacity, t.blur_intensity
+            )
+    else:
+        write_file_safe(DATA_STORAGE_DIR / "theme_settings.txt", t.theme)
+
+async def get_theme_settings_db() -> Dict[str, Any]:
+    if db_pool:
+        async with db_pool.acquire() as conn:
+            row = await conn.fetchrow("select current_theme, font, glassmorphic_opacity, blur_intensity from themes order by id asc limit 1")
+            if row:
+                return dict(row)
+    return {
+        "current_theme": (read_file_safe(DATA_STORAGE_DIR / "theme_settings.txt") or "cosmic-purple").strip(),
+        "font": "inter",
+        "glassmorphic_opacity": 0.2,
+        "blur_intensity": 20,
+    }
+
+async def save_feedback(f: FeedbackRequest):
+    if db_pool:
+        async with db_pool.acquire() as conn:
+            await conn.execute(
+                "insert into feedback (id, rating, message, visitor_name, visitor_email) values ($1,$2,$3,$4,$5)",
+                str(uuid.uuid4()), f.rating, f.message, f.visitor_name, f.visitor_email
+            )
+    else:
+        fb_file = DATA_STORAGE_DIR / "feedback" / "feedback.jsonl"
+        fb_file.parent.mkdir(parents=True, exist_ok=True)
+        async with aiofiles.open(fb_file, 'a', encoding='utf-8') as f_io:
+            await f_io.write(json.dumps(f.dict()) + "\n")
+
+# Lifespan
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    (DATA_STORAGE_DIR / "feedback").mkdir(parents=True, exist_ok=True)
+    (DATA_STORAGE_DIR / "analytics").mkdir(parents=True, exist_ok=True)
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    if not (DATA_STORAGE_DIR / "access_settings.txt").exists():
+        write_file_safe(DATA_STORAGE_DIR / "access_settings.txt", "Venky@access345")
+    if not (DATA_STORAGE_DIR / "theme_settings.txt").exists():
+        write_file_safe(DATA_STORAGE_DIR / "theme_settings.txt", "cosmic-purple")
     try:
-        analytics_file = DATA_STORAGE_DIR / "analytics" / "visits.json"
-        analytics_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Load existing analytics
-        analytics_data = []
-        if analytics_file.exists():
-            async with aiofiles.open(analytics_file, 'r', encoding='utf-8') as f:
-                content = await f.read()
-                try:
-                    analytics_data = json.loads(content) if content.strip() else []
-                except json.JSONDecodeError:
-                    analytics_data = []
-        
-        # Add new entry
-        entry = {
-            "id": str(uuid.uuid4()),
-            "event_type": event_type,
-            "timestamp": datetime.datetime.utcnow().isoformat(),
-            **data
-        }
-        analytics_data.append(entry)
-        
-        # Keep only last 1000 entries
-        analytics_data = analytics_data[-1000:]
-        
-        # Save analytics
-        async with aiofiles.open(analytics_file, 'w', encoding='utf-8') as f:
-            await f.write(json.dumps(analytics_data, indent=2, ensure_ascii=False))
-        
-        logger.info(f"✅ Analytics logged: {event_type}")
-        
+        await init_db_pool()
+        logger.info("Database initialized" if db_pool else "File storage mode active")
     except Exception as e:
-        logger.error(f"❌ Analytics logging failed: {e}")
+        logger.error(f"DB init failed, falling back to files: {e}")
+    yield
 
-# ========================================
-# ✅ HERO FIX: API ROUTES - ALL FIXED
-# ========================================
+app = FastAPI(title="Portfolio by Comet API", version="2.0.0", docs_url="/docs", redoc_url="/redoc", lifespan=lifespan)
 
-@app.get("/api/debug/files")
-async def debug_files():
-    """🦸‍♂️ HERO FIX: Debug endpoint to check file contents in real-time"""
-    try:
-        files_content = {}
-        
-        # Read access settings
-        access_file = DATA_STORAGE_DIR / "access_settings.txt"
-        if access_file.exists():
-            files_content['access_code'] = read_file_safe(access_file).strip()
-        
-        # Read theme settings  
-        theme_file = DATA_STORAGE_DIR / "theme_settings.txt"
-        if theme_file.exists():
-            files_content['current_theme'] = read_file_safe(theme_file).strip()
-                
-        # Read content file
-        if CONTENT_FILE.exists():
-            content = read_file_safe(CONTENT_FILE)
-            files_content['content_preview'] = content[:200] + "..." if len(content) > 200 else content
-                
-        files_content['working_directory'] = str(BASE_DIR)
-        files_content['files_exist'] = {
-            'access_settings': access_file.exists(),
-            'theme_settings': theme_file.exists(),
-            'content': CONTENT_FILE.exists()
-        }
-        
-        return {"success": True, "files": files_content}
-    except Exception as e:
-        return {"success": False, "error": str(e), "cwd": str(BASE_DIR)}
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://*.vercel.app",
+        "https://portfoliobycomet.vercel.app",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.get("/api/settings/refresh")
-async def refresh_settings():
-    """🦸‍♂️ HERO FIX: Force refresh all settings from files"""
-    try:
-        settings = {}
-        
-        # Access code
-        access_file = DATA_STORAGE_DIR / "access_settings.txt"
-        if access_file.exists():
-            settings['access_code'] = read_file_safe(access_file).strip()
-        
-        # Theme
-        theme_file = DATA_STORAGE_DIR / "theme_settings.txt"
-        if theme_file.exists():
-            settings['theme'] = read_file_safe(theme_file).strip()
-                
-        return {"success": True, "settings": settings}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@app.get("/api/themes")
-async def get_themes():
-    """🦸‍♂️ HERO FIX: Get themes with real-time file reading"""
-    try:
-        # Read current theme from file every time
-        current_theme = 'cosmic-purple'
-        theme_file = DATA_STORAGE_DIR / "theme_settings.txt"
-        if theme_file.exists():
-            current_theme = read_file_safe(theme_file).strip()
-        
-        themes = {
-            "creative": ["cosmic-purple", "lavender-dream", "rose-quartz", "crimson-red", "pink-flamingo", "purple-haze", "violet-storm"],
-            "tech": ["aurora-blue", "indigo-night", "cyan-wave", "sky-limit", "zinc-modern"],
-            "corporate": ["forest-green", "emerald-city", "slate-storm", "stone-age"],
-            "minimal": ["ocean-teal", "mint-fresh", "teal-depths", "neutral-space"],
-            "vibrant": ["sunset-orange", "golden-hour", "amber-glow", "lime-zest", "orange-burst"]
-        }
-        
-        return {"themes": themes, "current": current_theme}
-    except Exception as e:
-        return {"error": str(e)}
+# Routes
+@app.get("/api/health")
+async def health():
+    mode = "database" if db_pool else "files"
+    return {"status": "ok", "mode": mode, "env": ENVIRONMENT}
 
 @app.post("/api/auth/login")
-async def login(request: LoginRequest):
-    """Enhanced login with real-time access code validation."""
-    try:
-        # Read access code from file in real-time
-        access_file = DATA_STORAGE_DIR / "access_settings.txt"
-        if not access_file.exists():
-            raise HTTPException(status_code=500, detail="Access configuration not found")
-        
-        stored_access_code = read_file_safe(access_file).strip()
-        
-        if not stored_access_code:
-            raise HTTPException(status_code=500, detail="Access code not configured")
-        
-        if request.access_code != stored_access_code:
-            await log_analytics("login_failed", {
-                "username": request.username,
-                "reason": "invalid_access_code"
-            })
-            raise HTTPException(status_code=401, detail="Invalid access code")
-        
-        # Create token with expiration
-        access_token, expires = create_access_token(data={"sub": request.username})
-        
-        await log_analytics("login_success", {
-            "username": request.username,
-            "expires": expires.isoformat()
-        })
-        
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "expires_at": expires.isoformat(),
-            "user": {"username": request.username, "is_admin": True}
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Login error: {e}")
-        raise HTTPException(status_code=500, detail="Login failed")
+async def login(body: LoginRequest):
+    access_code = await get_access_code()
+    if not access_code or body.access_code != access_code:
+        raise HTTPException(status_code=401, detail="Invalid access code")
+    token, exp = create_access_token({"sub": body.username})
+    return {"access_token": token, "token_type": "bearer", "expires_at": exp.isoformat(), "user": {"username": body.username, "is_admin": True}}
 
 @app.get("/api/auth/verify")
-async def verify_auth(current_user = Depends(verify_token)):
-    """Verify authentication status."""
-    return {
-        "authenticated": True, 
-        "username": current_user["username"],
-        "expires": current_user["exp"]
-    }
-
-@app.get("/api/portfolio/content")
-async def get_portfolio_content(request: Request):
-    """Get portfolio content with visitor tracking."""
-    try:
-        # Log visitor
-        client_ip = request.client.host
-        user_agent = request.headers.get("user-agent", "unknown")
-        
-        await log_analytics("content_view", {
-            "ip": client_ip,
-            "user_agent": user_agent
-        })
-        
-        content = read_file_safe(CONTENT_FILE)
-        
-        # Parse content into structured data
-        sections = {}
-        current_section = None
-        
-        for line in content.split('\n'):
-            line = line.strip()
-            if line.startswith('[') and line.endswith(']'):
-                current_section = line[1:-1].lower()
-                sections[current_section] = {}
-            elif '=' in line and current_section:
-                key, value = line.split('=', 1)
-                sections[current_section][key.strip()] = value.strip()
-        
-        return {"content": sections, "status": "success"}
-        
-    except Exception as e:
-        logger.error(f"Content retrieval error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve portfolio content")
+async def verify(current=Depends(require_token)):
+    return {"authenticated": True, "username": current["username"], "expires": current["exp"]}
 
 @app.get("/api/settings/theme")
-async def get_theme_settings():
-    """Get current theme settings."""
-    try:
-        theme_file = DATA_STORAGE_DIR / "theme_settings.txt"
-        current_theme = read_file_safe(theme_file).strip() if theme_file.exists() else "cosmic-purple"
-        
-        return {
-            "current_theme": current_theme,
-            "current_font": "inter",
-            "glassmorphic_opacity": 0.2,
-            "blur_intensity": 20
-        }
-    except Exception as e:
-        logger.error(f"Theme settings error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve theme settings")
+async def get_theme():
+    data = await get_theme_settings_db()
+    return {
+        "current_theme": data.get("current_theme", "cosmic-purple"),
+        "current_font": data.get("font", "inter"),
+        "glassmorphic_opacity": float(data.get("glassmorphic_opacity", 0.2)),
+        "blur_intensity": int(data.get("blur_intensity", 20)),
+    }
 
 @app.put("/api/settings/theme")
-async def update_theme_settings(request: ThemeUpdateRequest, current_user = Depends(verify_token)):
-    """Update theme settings with validation."""
-    try:
-        theme_file = DATA_STORAGE_DIR / "theme_settings.txt"
-        
-        if write_file_safe(theme_file, request.theme):
-            await log_analytics("theme_change", {
-                "theme": request.theme,
-                "font": request.font,
-                "user": current_user["username"]
-            })
-            
-            return {"status": "success", "message": "Theme settings updated successfully"}
-        else:
-            raise HTTPException(status_code=500, detail="Failed to save theme settings")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Theme update error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update theme settings")
+async def update_theme(body: ThemeUpdateRequest, current=Depends(require_token)):
+    await set_theme_settings(body)
+    return {"status": "success"}
 
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.datetime.utcnow().isoformat(),
-        "version": "1.0.0-hero-fix",
-        "directories_ok": all([
-            DATA_STORAGE_DIR.exists(),
-            UPLOAD_DIR.exists()
-        ])
-    }
+@app.post("/api/feedback")
+async def create_feedback(body: FeedbackRequest):
+    await save_feedback(body)
+    return {"status": "ok"}
 
-@app.get("/api")
-async def root():
-    """Root API endpoint."""
-    return {
-        "message": "🦸‍♂️ Portfolio by Comet API - Hero Fixed Version",
-        "version": "1.0.0-hero-fix",
-        "status": "running",
-        "documentation": "/docs"
-    }
+@app.get("/api/portfolio/content")
+async def portfolio_content():
+    content = read_file_safe(CONTENT_FILE)
+    sections: Dict[str, Dict[str, str]] = {}
+    current_section = None
+    for line in content.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith('[') and line.endswith(']'):
+            current_section = line[1:-1].lower()
+            sections[current_section] = {}
+        elif '=' in line and current_section:
+            k, v = line.split('=', 1)
+            sections[current_section][k.strip()] = v.strip()
+    return {"content": sections}
 
-# ✅ HERO FIX: Exception handlers
+# Access restriction in production if access not configured
+@app.middleware("http")
+async def restrict_access_if_no_code(request: Request, call_next):
+    if ENVIRONMENT == "production":
+        access_code = await get_access_code()
+        if not access_code:
+            return JSONResponse(status_code=503, content={"detail": "Service unavailable: access not configured"})
+    return await call_next(request)
+
 @app.exception_handler(404)
-async def not_found_handler(request: Request, exc):
-    return JSONResponse(
-        status_code=404,
-        content={"detail": "Endpoint not found", "path": str(request.url.path)}
-    )
+async def not_found(request: Request, exc):
+    return JSONResponse(status_code=404, content={"detail": "Endpoint not found"})
 
 @app.exception_handler(500)
-async def internal_error_handler(request: Request, exc):
-    logger.error(f"Internal server error: {exc}")
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error"}
-    )
+async def internal_err(request: Request, exc):
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        app, 
-        host="0.0.0.0", 
-        port=8000,
-        reload=True,
-        log_level="info"
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
